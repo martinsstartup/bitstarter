@@ -24,7 +24,8 @@
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
-var HTMLFILE_DEFAULT = "index.html";
+var rest = require('restler');
+var HTMLFILE_DEFAULT = "index2.html";
 var CHECKSFILE_DEFAULT = "checks.json";
 
 var assertFileExists = function(infile) {
@@ -35,6 +36,21 @@ var assertFileExists = function(infile) {
     }
     return instr;
 };
+
+var writeUrlToFile = function(inurl) {
+    rest.get(inurl).on('complete', function(result) {
+        if (result instanceof Error) {
+            console.log("%s can't open URL. Exiting.", inurl);
+            process.exit(1); // try again after 5 sec
+        } else {
+            writeToDefaultFile(result);
+        }
+    });
+}
+
+var writeToDefaultFile = function(content){
+    fs.writeFileSync(HTMLFILE_DEFAULT, content);
+}
 
 var cheerioHtmlFile = function(htmlfile) {
     return cheerio.load(fs.readFileSync(htmlfile));
@@ -64,11 +80,13 @@ var clone = function(fn) {
 if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
+        .option('-u, --url <full_path_url>', 'Path to heroku site', clone(writeUrlToFile), undefined)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
         .parse(process.argv);
     var checkJson = checkHtmlFile(program.file, program.checks);
     var outJson = JSON.stringify(checkJson, null, 4);
     console.log(outJson);
+    console.log("File: %s, Json: %s, Url: %s", program.file, program.checks, program.url);
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
